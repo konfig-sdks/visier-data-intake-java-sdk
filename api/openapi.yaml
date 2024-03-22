@@ -1,0 +1,1167 @@
+openapi: 3.0.3
+info:
+  description: Visier APIs for sending raw or untransformed source data to Visier
+  license:
+    name: "Apache License, Version 2.0"
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  title: Visier Data Intake APIs
+  version: 22222222.99201.1200
+  x-api-status-urls: false
+  x-konfig-has-globally-required-security: true
+servers:
+- url: "https://{vanity-name}.api.visier.io"
+  variables:
+    vanity-name:
+      default: vanity
+security:
+- ApiKeyAuth: []
+  BearerAuth: []
+- ApiKeyAuth: []
+  CookieAuth: []
+- ApiKeyAuth: []
+  OAuth2Auth: []
+tags:
+- name: DataIntake
+- name: DataUpload
+paths:
+  /v1/op/data-sources:
+    get:
+      description: |-
+        Prior to transferring data to Visier, you must identify the sources you want to target. Sources store data for
+         the solution and are used to map data to Visier's data model.
+
+         Note: To set up sources in your tenant, contact Visier Customer Success.
+         This API allows you to query the list of available sources, and identify the source schema and required fields.
+      operationId: DataIntake_GetSources
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushDataSourceDefinitionsDTO'
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: Default error response
+      summary: Retrieve a list of sources
+      tags:
+      - DataIntake
+      x-konfig-operation-can-have-single-parameter: true
+      x-konfig-single-parameter-schema: konfig-generated-schema-single-parameter-schema-get--v1-op-data-sources
+      x-accepts: application/json
+  /v1/op/data-transfer-sessions:
+    post:
+      description: |-
+        Use this API to start a new transfer session. A transfer session can include one or more batches of records to be
+         sent to Visier. Batches of records may be transferred as JSON or file payloads.
+
+         Recommended: For optimal performance, please include all batches of records in a single transfer session.
+      operationId: DataIntake_StartTransfer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartTransferResponse'
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: Default error response
+      summary: Start a transfer session
+      tags:
+      - DataIntake
+      x-konfig-operation-can-have-single-parameter: true
+      x-konfig-single-parameter-schema: konfig-generated-schema-single-parameter-schema-post--v1-op-data-transfer-sessions
+      x-accepts: application/json
+  /v1/op/data-transfer-sessions/{transferSessionId}/add:
+    put:
+      description: |-
+        This API allows you to transfer data to Visier in batches of records. Each request includes a batch of records
+         formatted as a comma separated array with the first row containing the column headers in the request body. Each
+         subsequent request should also include the first row as a header.
+
+         Each request transfers a batch of records to a single source. Transfer sessions may include one or more batches before completion.
+
+         Each batch is identified by a sequence number. Sequence numbers help identify any batches  that were delivered incorrectly.
+
+         Each batch is limited to the following request size:
+         - Batch size limit: 10 MB
+         - Record count limit: 300,000 rows
+      operationId: DataIntake_PushData
+      parameters:
+      - description: The transfer session ID returned after the data transfer session
+          starts.
+        explode: false
+        in: path
+        name: transferSessionId
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: The unique identifier associated with the source you want to
+          transfer data to.
+        explode: true
+        in: query
+        name: sourceId
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: The unique sequence number associated with a batch of records.
+        explode: true
+        in: query
+        name: sequence
+        required: false
+        schema:
+          format: uint32
+          type: integer
+        style: form
+      - description: "The code of the tenant you want to transfer data to. For example,\
+          \ WFF_j1r or WFF_j1r~c7o."
+        explode: true
+        in: query
+        name: tenantCode
+        required: false
+        schema:
+          type: string
+        style: form
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataIntakePushDataRequest'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushDataResponse'
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: Default error response
+      summary: Transfer data to sources via JSON
+      tags:
+      - DataIntake
+      x-konfig-operation-can-have-single-parameter: false
+      x-content-type: application/json
+      x-accepts: application/json
+  /v1/op/data-transfer-sessions/{transferSessionId}/cancel:
+    put:
+      description: |-
+        This API allows you to cancel a transfer session after starting it. If a transfer session is cancelled, all
+         records within the transfer session do not persist in Visier’s data store.
+
+         If you cancel a transfer session, please start a new transfer session and resend the complete data set.
+
+         You might cancel a transfer session if:
+         - A request to send a batch of records failed.
+         - The original set of records is incomplete.
+         - An infrastructure error occurs.
+      operationId: DataIntake_PushDataCancel
+      parameters:
+      - description: The transfer session ID to cancel.
+        explode: false
+        in: path
+        name: transferSessionId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushDataCancelResponse'
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: Default error response
+      summary: Cancel a transfer session
+      tags:
+      - DataIntake
+      x-konfig-operation-can-have-single-parameter: true
+      x-konfig-single-parameter-schema: konfig-generated-schema-single-parameter-schema-put--v1-op-data-transfer-sessions-transferSessionId-cancel
+      x-accepts: application/json
+  /v1/op/data-transfer-sessions/{transferSessionId}/upload:
+    put:
+      description: |-
+        This API allows you to upload data to Visier as CSV or ZIP files. Each request transfers a single file. If the
+         data intended for Visier is stored in multiple files, you may compress them into a single ZIP file or make
+         multiple requests within the same transfer session.
+
+         File size limit: 3 GB
+
+         Each file is identified by a sequence number. Sequence numbers help identify any batches that were delivered incorrectly.
+
+         If you define a specific source in the request, all files within the request will target the declared source. If
+         a source is not defined, the filenames are matched against the source regex to correctly assign each file to a
+         source. To find out the source regex, please contact Visier Customer Success.
+
+         Note: If you include files that should target multiple sources in one ZIP file, do not define a source in the request.
+
+         Analytic tenants: For optimal transfer speed, provide one ZIP file per source.
+         Administrating tenants: For optimal transfer speed, provide one ZIP file containing all the required data files for your analytic tenants.
+         In the ZIP file, use one folder per analytic tenant. The ZIP file must adhere to the following file structure:
+
+         File1.zip
+         - Folder1: WFF_tenantCode1
+            - Filename1.csv
+            - Filename2.csv
+         - Folder2: WFF_tenantCode2
+            - Filename3.csv
+            - Filename4.csv
+      operationId: DataIntake_UploadData
+      parameters:
+      - description: The transfer session ID returned after the data transfer session
+          starts.
+        explode: false
+        in: path
+        name: transferSessionId
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: The unique identifier associated with the source you want to
+          transfer data to.
+        explode: true
+        in: query
+        name: sourceId
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: The unique sequence number associated with a batch of records.
+        explode: true
+        in: query
+        name: sequence
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: "The code of the tenant you want to transfer data to. For example,\
+          \ WFF_j1r or WFF_j1r~c7o."
+        explode: true
+        in: query
+        name: tenantCode
+        required: false
+        schema:
+          type: string
+        style: form
+      requestBody:
+        content:
+          application/json:
+            schema: {}
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushDataResponse'
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: Default error response
+      summary: Transfer data to sources via file upload
+      tags:
+      - DataIntake
+      x-konfig-operation-can-have-single-parameter: true
+      x-konfig-single-parameter-schema: konfig-generated-schema-single-parameter-schema-put--v1-op-data-transfer-sessions-transferSessionId-upload
+      x-content-type: application/json
+      x-accepts: application/json
+  /v1/op/jobs/processing-jobs/{receivingJobId}:
+    get:
+      description: |-
+        Use this API to retrieve a list of statuses for all processing jobs associated with the given receiving job ID.
+
+         Processing jobs deal with an individual analytic tenant's data load. A processing job is either triggered through
+         the UI or is one of many processing jobs spawned from a receiving job. When a processing job is triggered as part
+         of a set from an receiving job, it is associated to the receiving job through a Parent ID.
+      operationId: DataIntake_GetProcessingJobsByParentReceivingJobId
+      parameters:
+      - description: The receiving job ID.
+        explode: false
+        in: path
+        name: receivingJobId
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: The tenant code of the tenant you want to retrieve the processing
+          jobs for. Use this if you are only interested in the results for one analytic
+          tenant.
+        explode: true
+        in: query
+        name: tenantCode
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: The limit of processing jobs to retrieve per page.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          format: uint32
+          type: integer
+        style: form
+      - description: "The index to start retrieving results from, also known as offset.\
+          \ The index begins at 0."
+        explode: true
+        in: query
+        name: start
+        required: false
+        schema:
+          format: uint32
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetProcessingJobsResponse'
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: Default error response
+      summary: Retrieve processing job statuses by receiving job ID
+      tags:
+      - DataIntake
+      x-konfig-operation-can-have-single-parameter: true
+      x-konfig-single-parameter-schema: konfig-generated-schema-single-parameter-schema-get--v1-op-jobs-processing-jobs-receivingJobId
+      x-accepts: application/json
+  /v1/op/jobs/receiving-jobs:
+    post:
+      description: |-
+        This API allows you to complete the specified transfer session by triggering a receiving job. A receiving job
+         validates the transferred data and adds the transferred data to Visier’s data store.
+
+         You can set an optional parameter to generate a data version through a processing job immediately after the receiving job completes.
+      operationId: DataIntake_PushDataComplete
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushDataCompleteRequest'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushDataCompleteResponse'
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: Default error response
+      summary: Complete a transfer session
+      tags:
+      - DataIntake
+      x-konfig-operation-can-have-single-parameter: true
+      x-konfig-single-parameter-schema: konfig-generated-schema-single-parameter-schema-post--v1-op-jobs-receiving-jobs
+      x-content-type: application/json
+      x-accepts: application/json
+  /v1/op/jobs/receiving-jobs/{receivingJobId}:
+    get:
+      description: |-
+        After completing a transfer session, you may want to know the status of the receiving job and the associated tenant
+         receiving jobs. A receiving job validates the transferred data and adds the transferred data to Visier’s data store.
+
+         Use this API to retrieve the receiving job status and summary of analytic tenant receiving jobs.
+      operationId: DataIntake_ReceivingJobStatus
+      parameters:
+      - description: The **dataReceivingJobId** provided after a data transfer session
+          completes. See **`/v1/op/jobs/receiving-jobs`**.
+        explode: false
+        in: path
+        name: receivingJobId
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: "If true, returns the status of receiving jobs spawned by the\
+          \ receiving job specified by receivingJobId."
+        explode: true
+        in: query
+        name: jobs
+        required: false
+        schema:
+          type: boolean
+        style: form
+      - description: The tenant code of the tenant you want to retrieve the receiving
+          jobs for. Use this if you are only interested in the results for one analytic
+          tenant.
+        explode: true
+        in: query
+        name: tenantCode
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: "The index to start retrieving results from, also known as offset.\
+          \ The index begins at 0."
+        explode: true
+        in: query
+        name: start
+        required: false
+        schema:
+          format: uint32
+          type: integer
+        style: form
+      - description: The number of job statuses to return per page.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          format: uint32
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceivingJobStatusResponse'
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: Default error response
+      summary: Retrieve a receiving job’s status
+      tags:
+      - DataIntake
+      x-konfig-operation-can-have-single-parameter: true
+      x-konfig-single-parameter-schema: konfig-generated-schema-single-parameter-schema-get--v1-op-jobs-receiving-jobs-receivingJobId
+      x-accepts: application/json
+  /v1alpha/data/upload/files/{filename}:
+    put:
+      description: "Use this API to upload data files to Visier. You can upload ZIP,\
+        \ CSV, XLS, and XLSX filetypes in plaintext or encrypted with Visier's PGP\
+        \ key. The maximum file upload size is 5 GB.\n\n Use of this API requires\
+        \ client redirect. This API redirects requests directly to Visier's upload\
+        \ infrastructure to support long-running uploads. \n To ensure efficient uploading,\
+        \ we recommend that you use an HTTP client that supports the 100 Continue\
+        \ status code.\n\n <br>**Note:** <em>This API is in **alpha**. While in alpha,\
+        \ APIs may change in a breaking way without notice; functionality may be removed,\
+        \ and no deprecation notices will be issued.\n If you are interested in using\
+        \ this API, please contact your Customer Success Manager (CSM).</em>"
+      operationId: DataUpload_fileToVisier
+      parameters:
+      - description: "The filename of the data file to upload, including the file\
+          \ extension (such as .zip or .csv)."
+        explode: false
+        in: path
+        name: filename
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: '#/components/schemas/DataUploadFileToVisierRequest'
+      responses:
+        "307":
+          description: Redirect to Visier's upload infrastructure.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: Default error response
+      summary: Upload a data file to Visier
+      tags:
+      - DataUpload
+      x-konfig-operation-can-have-single-parameter: false
+      x-content-type: '*/*'
+      x-accepts: application/json
+components:
+  schemas:
+    DataTransferResultDetail:
+      example:
+        sourceNames:
+        - sourceNames
+        - sourceNames
+        dataSize: dataSize
+        tenantCode: tenantCode
+        rows: rows
+      properties:
+        tenantCode:
+          description: "The code of the tenant that data was transferred to. For example,\
+            \ WFF_j1r or WFF_j1r~c7o."
+          type: string
+        sourceNames:
+          description: A list of strings representing the sources that received a
+            data transfer.
+          items:
+            type: string
+          type: array
+        dataSize:
+          description: The total size of the transfer session in bytes.
+          type: string
+        rows:
+          description: The total number of rows transferred during the transfer session.
+          type: string
+      type: object
+    GetProcessingJobsResponse:
+      example:
+        processingJobs:
+        - jobId: jobId
+          dataVersion: dataVersion
+          tenantCode: tenantCode
+          message: message
+          status: status
+        - jobId: jobId
+          dataVersion: dataVersion
+          tenantCode: tenantCode
+          message: message
+          status: status
+        parentJobId: parentJobId
+        limit: 0
+        start: 6
+        parentTenantCode: parentTenantCode
+      properties:
+        parentJobId:
+          description: The job ID of the receiving job that spawned this job.
+          type: string
+        parentTenantCode:
+          description: The tenant code of the receiving job that spawned this job.
+          type: string
+        limit:
+          description: The limit of processing jobs to retrieve per page.
+          format: uint32
+          type: integer
+        start:
+          description: "The index to start retrieving results from, also known as\
+            \ offset. The index begins at 0."
+          format: uint32
+          type: integer
+        processingJobs:
+          description: A list of objects representing the processing jobs to retrieve.
+          items:
+            $ref: '#/components/schemas/ProcessingJob'
+          type: array
+      type: object
+      x-konfig-is-used-in-successful-response: true
+    GoogleProtobufAny:
+      additionalProperties: true
+      description: Contains an arbitrary serialized message along with a @type that
+        describes the type of the serialized message.
+      example:
+        '@type': '@type'
+      properties:
+        '@type':
+          description: The type of the serialized message.
+          type: string
+      type: object
+    Job:
+      example:
+        receivingJobId: receivingJobId
+        tenantCode: tenantCode
+        status: status
+      properties:
+        receivingJobId:
+          description: The job ID of the receiving job for the analytic tenant.
+          type: string
+        tenantCode:
+          description: The analytic tenant code.
+          type: string
+        status:
+          description: The status of the receiving job for the analytic tenant.
+          type: string
+      type: object
+    ProcessingJob:
+      example:
+        jobId: jobId
+        dataVersion: dataVersion
+        tenantCode: tenantCode
+        message: message
+        status: status
+      properties:
+        jobId:
+          description: The job ID of the processing job for the analytic tenant.
+          type: string
+        tenantCode:
+          description: The analytic tenant code.
+          type: string
+        dataVersion:
+          description: The data version associated with the processing job.
+          type: string
+        status:
+          description: The status of the receiving job for the analytic tenant.
+          type: string
+        message:
+          description: A meaningful message about the processing job.
+          type: string
+      type: object
+    PushDataCancelResponse:
+      example:
+        dataTransferResultDetails:
+        - sourceNames:
+          - sourceNames
+          - sourceNames
+          dataSize: dataSize
+          tenantCode: tenantCode
+          rows: rows
+        - sourceNames:
+          - sourceNames
+          - sourceNames
+          dataSize: dataSize
+          tenantCode: tenantCode
+          rows: rows
+        transferSessionId: transferSessionId
+        message: message
+        status: status
+      properties:
+        message:
+          description: A meaningful message about the transfer session.
+          type: string
+        transferSessionId:
+          description: The unique identifier associated with the transfer session.
+          type: string
+        dataTransferResultDetails:
+          description: A list of objects representing the results of the transfer
+            session.
+          items:
+            $ref: '#/components/schemas/DataTransferResultDetail'
+          type: array
+        status:
+          description: The status of the transfer session. A cancelled session returns
+            the status CANCELLED.
+          type: string
+      type: object
+      x-konfig-is-used-in-successful-response: true
+    PushDataColumnDefinitionDTO:
+      description: Definition of the source column.
+      example:
+        allowEmpty: true
+        defaultValue: defaultValue
+        dataType: dataType
+        dataFormats:
+        - dataFormats
+        - dataFormats
+        isMandatory: true
+        columnName: columnName
+      properties:
+        columnName:
+          description: The name of the column.
+          type: string
+        dataType:
+          description: The data type associated with the column.
+          type: string
+        dataFormats:
+          description: The expected format for datetime data types.
+          items:
+            type: string
+          type: array
+        isMandatory:
+          description: "If true, the column value is required. If a column is mandatory,\
+            \ and the file is missing this column, the request will fail."
+          type: boolean
+        allowEmpty:
+          description: "If true, the column allows an empty value for the record."
+          type: boolean
+        defaultValue:
+          description: The default value of the column.
+          type: string
+      type: object
+    PushDataCompleteRequest:
+      example:
+        transferSessionId: transferSessionId
+        processingData: true
+      properties:
+        transferSessionId:
+          description: The unique identifier associated with the transfer session.
+          type: string
+        processingData:
+          description: "If true, a processing job will be triggered after the receiving\
+            \ job successfully completes. This generates a new data version."
+          type: boolean
+      type: object
+    PushDataCompleteResponse:
+      example:
+        dataTransferResultDetails:
+        - sourceNames:
+          - sourceNames
+          - sourceNames
+          dataSize: dataSize
+          tenantCode: tenantCode
+          rows: rows
+        - sourceNames:
+          - sourceNames
+          - sourceNames
+          dataSize: dataSize
+          tenantCode: tenantCode
+          rows: rows
+        transferSessionId: transferSessionId
+        message: message
+        dataReceivingJobId: dataReceivingJobId
+        status: status
+      properties:
+        dataReceivingJobId:
+          description: The unique identifier associated with the receiving job.
+          type: string
+        message:
+          description: A meaningful message about the transfer session.
+          type: string
+        transferSessionId:
+          description: The unique identifier associated with the transfer session.
+          type: string
+        dataTransferResultDetails:
+          description: A list of objects representing the results of the transfer
+            session.
+          items:
+            $ref: '#/components/schemas/DataTransferResultDetail'
+          type: array
+        status:
+          description: The status of the transfer session. A completed session returns
+            the status SUCCEED.
+          type: string
+      type: object
+      x-konfig-is-used-in-successful-response: true
+    PushDataResponse:
+      example:
+        sequence: 0
+        tenants:
+        - sources:
+          - sourceId: sourceId
+            dataSize: dataSize
+            sourceName: sourceName
+            rows: rows
+            message: message
+            status: status
+          - sourceId: sourceId
+            dataSize: dataSize
+            sourceName: sourceName
+            rows: rows
+            message: message
+            status: status
+          tenantCode: tenantCode
+          status: status
+        - sources:
+          - sourceId: sourceId
+            dataSize: dataSize
+            sourceName: sourceName
+            rows: rows
+            message: message
+            status: status
+          - sourceId: sourceId
+            dataSize: dataSize
+            sourceName: sourceName
+            rows: rows
+            message: message
+            status: status
+          tenantCode: tenantCode
+          status: status
+        transferSessionId: transferSessionId
+        message: message
+        status: status
+      properties:
+        transferSessionId:
+          description: The unique identifier associated with the transfer session.
+          type: string
+        sequence:
+          description: The unique sequence number associated with a batch of records.
+          format: uint32
+          type: integer
+        status:
+          description: The status of the data transfer.
+          type: string
+        message:
+          description: Any additional information about the data transfer.
+          type: string
+        tenants:
+          description: A list of strings representing the tenants that data was pushed
+            to and their data transfer results.
+          items:
+            $ref: '#/components/schemas/Tenant'
+          type: array
+      type: object
+      x-konfig-is-used-in-successful-response: true
+    PushDataSourceDefinitionDTO:
+      description: Details of each existing source.
+      example:
+        sourceId: sourceId
+        columns:
+        - allowEmpty: true
+          defaultValue: defaultValue
+          dataType: dataType
+          dataFormats:
+          - dataFormats
+          - dataFormats
+          isMandatory: true
+          columnName: columnName
+        - allowEmpty: true
+          defaultValue: defaultValue
+          dataType: dataType
+          dataFormats:
+          - dataFormats
+          - dataFormats
+          isMandatory: true
+          columnName: columnName
+        name: name
+        isInherited: true
+      properties:
+        sourceId:
+          description: The unique identifier associated with the source.
+          type: string
+        name:
+          description: The object name of the source.
+          type: string
+        columns:
+          description: A list of objects representing the source columns.
+          items:
+            $ref: '#/components/schemas/PushDataColumnDefinitionDTO'
+          type: array
+        isInherited:
+          description: "If true, the source is inherited by all analytic tenants."
+          type: boolean
+      type: object
+    PushDataSourceDefinitionsDTO:
+      description: The existing sources.
+      example:
+        sources:
+        - sourceId: sourceId
+          columns:
+          - allowEmpty: true
+            defaultValue: defaultValue
+            dataType: dataType
+            dataFormats:
+            - dataFormats
+            - dataFormats
+            isMandatory: true
+            columnName: columnName
+          - allowEmpty: true
+            defaultValue: defaultValue
+            dataType: dataType
+            dataFormats:
+            - dataFormats
+            - dataFormats
+            isMandatory: true
+            columnName: columnName
+          name: name
+          isInherited: true
+        - sourceId: sourceId
+          columns:
+          - allowEmpty: true
+            defaultValue: defaultValue
+            dataType: dataType
+            dataFormats:
+            - dataFormats
+            - dataFormats
+            isMandatory: true
+            columnName: columnName
+          - allowEmpty: true
+            defaultValue: defaultValue
+            dataType: dataType
+            dataFormats:
+            - dataFormats
+            - dataFormats
+            isMandatory: true
+            columnName: columnName
+          name: name
+          isInherited: true
+      properties:
+        sources:
+          description: A list of objects representing the target sources for the request.
+          items:
+            $ref: '#/components/schemas/PushDataSourceDefinitionDTO'
+          type: array
+      type: object
+      x-konfig-is-used-in-successful-response: true
+    ReceivingJobStatusResponse:
+      example:
+        jobId: jobId
+        parentJobId: parentJobId
+        receivingJobs:
+        - receivingJobId: receivingJobId
+          tenantCode: tenantCode
+          status: status
+        - receivingJobId: receivingJobId
+          tenantCode: tenantCode
+          status: status
+        status: status
+        parentTenantCode: parentTenantCode
+      properties:
+        jobId:
+          description: The unique identifier associated with the receiving job.
+          type: string
+        status:
+          description: The status of the receiving job.
+          type: string
+        parentJobId:
+          description: The job ID of the receiving job that spawned this job.
+          type: string
+        parentTenantCode:
+          description: The tenant code of the receiving job that spawned  this job.
+          type: string
+        receivingJobs:
+          description: A list of objects representing the receiving jobs to retrieve.
+          items:
+            $ref: '#/components/schemas/Job'
+          type: array
+      type: object
+      x-konfig-is-used-in-successful-response: true
+    Source:
+      example:
+        sourceId: sourceId
+        dataSize: dataSize
+        sourceName: sourceName
+        rows: rows
+        message: message
+        status: status
+      properties:
+        sourceId:
+          description: The unique identifier associated with the source that data
+            was transferred to.
+          type: string
+        sourceName:
+          description: The object name of the source.
+          type: string
+        dataSize:
+          description: The size of the data transfer in bytes.
+          type: string
+        rows:
+          description: The number of rows in the data transfer.
+          type: string
+        status:
+          description: The status of the data transfer for this source.
+          type: string
+        message:
+          description: A meaningful message about the data transfer.
+          type: string
+      type: object
+    StartTransferResponse:
+      example:
+        transferSessionId: transferSessionId
+      properties:
+        transferSessionId:
+          description: The unique identifier associated with the transfer session.
+          type: string
+      type: object
+      x-konfig-is-used-in-successful-response: true
+    Status:
+      description: "The `Status` type defines a logical error model that is suitable\
+        \ for different programming environments, including REST APIs and RPC APIs.\
+        \ It is used by [gRPC](https://github.com/grpc). Each `Status` message contains\
+        \ three pieces of data: error code, error message, and error details. You\
+        \ can find out more about this error model and how to work with it in the\
+        \ [API Design Guide](https://cloud.google.com/apis/design/errors)."
+      example:
+        code: 0
+        details:
+        - '@type': '@type'
+        - '@type': '@type'
+        message: message
+      properties:
+        code:
+          description: "The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code]."
+          format: int32
+          type: integer
+        message:
+          description: "A developer-facing error message, which should be in English.\
+            \ Any user-facing error message should be localized and sent in the [google.rpc.Status.details][google.rpc.Status.details]\
+            \ field, or localized by the client."
+          type: string
+        details:
+          description: A list of messages that carry the error details.  There is
+            a common set of message types for APIs to use.
+          items:
+            $ref: '#/components/schemas/GoogleProtobufAny'
+          type: array
+      type: object
+      x-konfig-is-used-in-successful-response: true
+    Tenant:
+      example:
+        sources:
+        - sourceId: sourceId
+          dataSize: dataSize
+          sourceName: sourceName
+          rows: rows
+          message: message
+          status: status
+        - sourceId: sourceId
+          dataSize: dataSize
+          sourceName: sourceName
+          rows: rows
+          message: message
+          status: status
+        tenantCode: tenantCode
+        status: status
+      properties:
+        tenantCode:
+          description: "The code of the tenant that data was transferred to. For example,\
+            \ WFF_j1r or WFF_j1r~c7o."
+          type: string
+        status:
+          description: The status of the data transfer for this tenant.
+          type: string
+        sources:
+          description: A list of objects representing the sources that data was pushed
+            to and their data transfer results.
+          items:
+            $ref: '#/components/schemas/Source'
+          type: array
+      type: object
+    DataIntakePushDataRequest:
+      type: string
+    DataUploadFileToVisierRequest:
+      format: binary
+      type: string
+    konfig-generated-schema-single-parameter-schema-get--v1-op-data-sources:
+      properties: {}
+      type: object
+      x-do-not-generate: true
+      x-konfig-is-parameter: []
+    konfig-generated-schema-single-parameter-schema-post--v1-op-data-transfer-sessions:
+      properties: {}
+      type: object
+      x-do-not-generate: true
+      x-konfig-is-parameter: []
+    konfig-generated-schema-single-parameter-schema-put--v1-op-data-transfer-sessions-transferSessionId-cancel:
+      properties:
+        transferSessionId:
+          type: string
+      required:
+      - transferSessionId
+      type: object
+      x-do-not-generate: true
+      x-konfig-is-parameter:
+      - transferSessionId
+    konfig-generated-schema-single-parameter-schema-put--v1-op-data-transfer-sessions-transferSessionId-upload:
+      properties:
+        transferSessionId:
+          type: string
+        sourceId:
+          type: string
+        sequence:
+          type: string
+        tenantCode:
+          type: string
+      required:
+      - transferSessionId
+      type: object
+      x-do-not-generate: true
+      x-konfig-is-parameter:
+      - transferSessionId
+      - sourceId
+      - sequence
+      - tenantCode
+    konfig-generated-schema-single-parameter-schema-get--v1-op-jobs-processing-jobs-receivingJobId:
+      properties:
+        receivingJobId:
+          type: string
+        tenantCode:
+          type: string
+        limit:
+          format: uint32
+          type: integer
+        start:
+          format: uint32
+          type: integer
+      required:
+      - receivingJobId
+      type: object
+      x-do-not-generate: true
+      x-konfig-is-parameter:
+      - receivingJobId
+      - tenantCode
+      - limit
+      - start
+    konfig-generated-schema-single-parameter-schema-post--v1-op-jobs-receiving-jobs:
+      properties:
+        transferSessionId:
+          description: The unique identifier associated with the transfer session.
+          type: string
+        processingData:
+          description: "If true, a processing job will be triggered after the receiving\
+            \ job successfully completes. This generates a new data version."
+          type: boolean
+      type: object
+      x-do-not-generate: true
+      x-konfig-is-parameter: []
+    konfig-generated-schema-single-parameter-schema-get--v1-op-jobs-receiving-jobs-receivingJobId:
+      properties:
+        receivingJobId:
+          type: string
+        jobs:
+          type: boolean
+        tenantCode:
+          type: string
+        start:
+          format: uint32
+          type: integer
+        limit:
+          format: uint32
+          type: integer
+      required:
+      - receivingJobId
+      type: object
+      x-do-not-generate: true
+      x-konfig-is-parameter:
+      - receivingJobId
+      - jobs
+      - tenantCode
+      - start
+      - limit
+  securitySchemes:
+    CookieAuth:
+      in: cookie
+      name: VisierASIDToken
+      type: apiKey
+      x-konfig-globally-required-security: false
+    ApiKeyAuth:
+      in: header
+      name: apikey
+      type: apiKey
+      x-konfig-globally-required-security: true
+    BearerAuth:
+      scheme: bearer
+      type: http
+      x-konfig-globally-required-security: false
+    OAuth2Auth:
+      flows:
+        authorizationCode:
+          authorizationUrl: /v1/auth/oauth2/authorize
+          scopes:
+            read: Grants read access
+            write: Grants write access
+          tokenUrl: /v1/auth/oauth2/token
+        password:
+          scopes:
+            read: Grants read access
+            write: Grants write access
+          tokenUrl: /v1/auth/oauth2/token
+      type: oauth2
+      x-konfig-globally-required-security: false
+
